@@ -9,6 +9,10 @@
 <meta name="apple-mobile-web-app-title" content="Juegos de Fiesta">
 <meta name="mobile-web-app-capable" content="yes">
 <title>🎮 Juegos de Fiesta</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
 <style>
 
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;800;900&display=swap');
@@ -7330,6 +7334,53 @@ function launchQuien(){
   document.getElementById('launcher').style.display='none';
   document.getElementById('q-wrap').classList.add('show');
   qBuildNames();
+}
+
+// ── PWA: Service Worker inline (funciona sin servidor externo) ──
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'juegos-fiesta-v1';
+    const ASSETS = ['/'];
+
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+      self.skipWaiting();
+    });
+
+    self.addEventListener('activate', e => {
+      e.waitUntil(
+        caches.keys().then(keys =>
+          Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+        )
+      );
+      self.clients.claim();
+    });
+
+    self.addEventListener('fetch', e => {
+      if (e.request.method !== 'GET') return;
+      e.respondWith(
+        caches.match(e.request).then(cached => {
+          const fetchPromise = fetch(e.request).then(res => {
+            if (res.ok) {
+              const clone = res.clone();
+              caches.open(CACHE).then(c => c.put(e.request, clone));
+            }
+            return res;
+          }).catch(() => null);
+          return cached || fetchPromise;
+        })
+      );
+    });
+  `;
+
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(blob);
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(swUrl)
+      .then(reg => console.log('✅ SW registrado:', reg.scope))
+      .catch(err => console.error('❌ SW error:', err));
+  });
 }
 
 </script>
